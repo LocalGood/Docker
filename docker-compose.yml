@@ -1,0 +1,43 @@
+version: '2'
+
+services:
+# Reverse proxy
+  web:
+    image: nginx
+    ports:
+      - '80:80'
+    volumes:
+      - ./volumes/etc/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./volumes/etc/nginx/conf.d:/etc/nginx/conf.d
+      - ./volumes/var/www/html:/var/www/html
+      - ./volumes/var/www/html/omniconfig/city:/var/www/html/goteo/city/omniconfig
+      - ./volumes/var/www/html/omniconfig/city:/var/www/html/wordpress/city/omniconfig
+
+    restart: always
+    depends_on:
+      - goteo_city
+      - wp_city
+
+# ==========================
+# LOCALGOOD sample city
+# ==========================
+  goteo_city:
+    build:
+      context: ./build/goteo
+    volumes:
+      - ./volumes/var/www/html/goteo/city:/var/www/html
+      - ./volumes/var/www/html/omniconfig/city:/var/www/html/omniconfig
+    env_file:
+      - ./city.env
+    restart: always
+
+  wp_city:
+    build:
+      context: ./build/wp
+    volumes:
+      - ./volumes/var/www/html/wordpress/city:/var/www/html
+      - ./volumes/var/www/html/omniconfig/city:/var/www/html/omniconfig
+    env_file:
+      - ./city.env
+    restart: always
+

@@ -1,0 +1,77 @@
+server {
+    listen       80;
+    server_name  sendai.localgood.jp;
+
+    client_max_body_size 20M;
+
+    # Default off
+    set $lb_https off;
+
+#    if ($http_x_forwarded_proto = http) {
+#        return 301 https://$host$request_uri$is_args$args;
+#    }
+    if ($http_x_forwarded_proto = https) {
+        set $lb_https on;
+    }
+
+    # For debug set to 1
+    set $do_not_cache 0;
+
+    # Cache Control
+    if ($request_method !~ ^(GET)$) {
+        set $do_not_cache 0;
+    }
+    if ($request_uri ~* "/wp-admin/|/xmlrpc.php|wp-.*.php|/feed/|index.php|sitemap(_index)?.xml") {
+        set $do_not_cache 0;
+    }
+    if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") {
+        set $do_not_cache 0;
+    }
+
+    # PC is default
+    set $device pc;
+
+    if ($http_user_agent ~* '(DoCoMo|KDDI|Up\.Browser|J-PHONE|Vodafone|SoftBank|MOT-[CV])') {
+        set $device fp;
+    }
+    if ($http_user_agent ~* '(iPod|iPhone|Android.+Mobile)') {
+        set $device sp;
+    }
+
+    location ~ /\. {
+        deny  all;
+    }
+
+    location / {
+        root      /var/www/html/wordpress/sendai;
+        index     index.php;
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+
+    location ~ \.php$ {
+        fastcgi_no_cache      $do_not_cache;
+        fastcgi_cache_bypass  $do_not_cache;
+
+        fastcgi_cache            czone_f;
+        fastcgi_cache_key        "$request_method $scheme://$host$request_uri$is_args$args $device";
+        fastcgi_cache_valid      200 301 302 10m;
+        fastcgi_cache_valid      404 5m;
+        fastcgi_cache_use_stale  error timeout invalid_header updating http_500 http_503;
+        fastcgi_pass_header      X-Accel-Expires;
+
+        root           /var/www/html;
+        fastcgi_pass   wp_sendai:9000;
+        fastcgi_index  index.php;
+        fastcgi_param  HTTPS $lb_https;
+        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param  PHP_VALUE "
+            date.timezone = Asia/Tokyo
+            short_open_tag = On
+            expose_php = Off
+            display_errors = Off
+            upload_max_filesize = 4M
+            post_max_size = 16M
+        ";
+        include        fastcgi_params;
+    }
+}
